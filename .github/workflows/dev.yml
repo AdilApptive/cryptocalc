@@ -1,0 +1,47 @@
+name: Dev Build
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+env:
+  FLUTTER_VERSION: '3.32.4'
+
+jobs:
+  android-dev-build:
+    name: Build Android APK (Dev)
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+
+      - name: Install dependencies
+        run: flutter pub get
+
+      - name: Build runner
+        run: dart run build_runner build --delete-conflicting-outputs
+
+      - name: Decode keystore
+        run: |
+          echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 --decode > android/app/upload-keystore.jks
+          echo "storePassword=${{ secrets.KEYSTORE_PASSWORD }}" > android/key.properties
+          echo "keyPassword=${{ secrets.KEY_PASSWORD }}" >> android/key.properties
+          echo "keyAlias=${{ secrets.KEY_ALIAS }}" >> android/key.properties
+          echo "storeFile=./upload-keystore.jks" >> android/key.properties
+
+      - name: Build APK (Release for Dev)
+        run: flutter build apk --release
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: android-dev-apk-${{ github.sha }}
+          path: build/app/outputs/flutter-apk/app-release.apk
